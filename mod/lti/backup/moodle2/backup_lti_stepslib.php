@@ -56,8 +56,6 @@ class backup_lti_activity_structure_step extends backup_activity_structure_step 
 
     protected function define_structure() {
 
-        // TODO: MDL-34161 - Fix restore to support course/site tools & submissions.
-
         // To know if we are including userinfo
         $userinfo = $this->get_setting_value('userinfo');
 
@@ -88,11 +86,29 @@ class backup_lti_activity_structure_step extends backup_activity_structure_step 
             )
         );
 
+        $ltitypes = new backup_nested_element( 'ltitypes' );
+        $ltitype  = new backup_nested_element( 'ltitype', array( 'id' ), array( 'name', 'baseurl' ) );
+
         // Build the tree
-        // (none)
+        $lti->add_child( $ltitypes );
+        $ltitypes->add_child( $ltitype );
 
         // Define sources
-        $lti->set_source_table('lti', array('id' => backup::VAR_ACTIVITYID));
+        $lti->set_source_table( 'lti', array( 'id' => backup::VAR_ACTIVITYID ) );
+        $ltitype->set_source_sql(
+            "
+                select
+                    lt.id, lt.name, lt.baseurl
+                from
+                    {lti} l
+                join
+                    {lti_types} lt
+                    on lt.id = l.typeid
+                where
+                    l.id = ?
+            ",
+            array( backup::VAR_ACTIVITYID )
+        );
 
         // Define id annotations
         // (none)

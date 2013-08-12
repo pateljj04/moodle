@@ -57,7 +57,8 @@ class restore_lti_activity_structure_step extends restore_activity_structure_ste
     protected function define_structure() {
 
         $paths = array();
-        $paths[] = new restore_path_element('lti', '/activity/lti');
+        $paths[] = new restore_path_element( 'lti', '/activity/lti' );
+        $paths[] = new restore_path_element( 'ltitype', '/activity/lti/ltitypes/ltitype' );
 
         // Return the paths wrapped into standard activity structure
         return $this->prepare_activity_structure($paths);
@@ -70,17 +71,43 @@ class restore_lti_activity_structure_step extends restore_activity_structure_ste
         $oldid = $data->id;
         $data->course = $this->get_courseid();
         $data->servicesalt = uniqid('', true);
-
-        // Clean any course or site typeid. All modules
-        // are restored as self-contained. Note this is
-        // an interim solution until the issue below is implemented.
-        // TODO: MDL-34161 - Fix restore to support course/site tools & submissions.
         $data->typeid = 0;
 
         $newitemid = $DB->insert_record('lti', $data);
 
         // immediately after inserting "activity" record, call this
         $this->apply_activity_instance($newitemid);
+    }
+
+    protected function process_ltitype( $data ) {
+        global $DB;
+
+        $data = (object)$data;
+
+        $localtype = $DB->get_record_sql(
+            "
+                select
+                    id
+                from
+                    {lti_types}
+                where
+                    name = ?
+                    and baseurl = ?
+                order by
+                    coursevisible desc,
+                    state asc
+            ",
+            array( $data->name, $data->baseurl )
+        );
+
+        if( !empty( $localtype->id ) )
+        {
+            $lti = new stdClass( );
+            $lti->id = $this->get_new_parentid( 'lti' );
+            $lti->typeid = $localtype->id;
+
+            $DB->update_record( 'lti', $lti );
+        }
     }
 
     protected function after_execute() {
